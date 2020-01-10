@@ -30,7 +30,7 @@ type LunchOrder struct {
 	Day      int                `json:"day,omitempty" bson:"day,omitempty"`
 }
 
-func CreateLunchOrderEndpoint(response http.ResponseWriter, request *http.Request) {
+func CreateLunchOrder(response http.ResponseWriter, request *http.Request) {
 	response.Header().Add("content-type", "application/json")
 
 	var lunchOrder LunchOrder
@@ -45,6 +45,40 @@ func CreateLunchOrderEndpoint(response http.ResponseWriter, request *http.Reques
 	json.NewEncoder(response).Encode(result)
 }
 
+func GetLunchOrderByUser(response http.ResponseWriter, request *http.Request) {
+	response.Header().Add("content-type", "application/json")
+	params := mux.Vars(request)
+	userID, _ := primitive.ObjectIDFromHex(params["user_id"])
+	var lunchOrders []LunchOrder
+
+	collection := dbClient.Database(dbName).Collection(dbCollectionLunchOrder)
+	ctx, _ := context.WithTimeout(context.Background(), dbRequestDuration)
+
+	cursor, err := collection.Find(ctx, LunchOrder{UserID: userID})
+
+	if err != nil {
+		response.WriteHeader(http.StatusInternalServerError)
+		response.Write([]byte(`{"message": "` + err.Error() + `"}`))
+		return
+	}
+
+	defer cursor.Close(ctx)
+
+	for cursor.Next(ctx) {
+		var lunchOrder LunchOrder
+		cursor.Decode(&lunchOrder)
+		lunchOrders = append(lunchOrders, lunchOrder)
+	}
+
+	if err := cursor.Err(); err != nil {
+		response.WriteHeader(http.StatusInternalServerError)
+		response.Write([]byte(`{"message": "` + err.Error() + `"}`))
+		return
+	}
+
+	json.NewEncoder(response).Encode(lunchOrders)
+}
+
 func main() {
 	fmt.Println("Application start...")
 
@@ -52,7 +86,8 @@ func main() {
 	dbClient, _ = mongo.Connect(ctx, options.Client().ApplyURI(dbURI))
 	router := mux.NewRouter()
 
-	router.HandleFunc("/lunchorder", CreateLunchOrderEndpoint).Methods("POST")
+	router.HandleFunc("/lunchorder", CreateLunchOrder).Methods("POST")
+	router.HandleFunc("/lunchorder/{user_id}", GetLunchOrderByUser).Methods("GET")
 
 	http.ListenAndServe(port, router)
 }
