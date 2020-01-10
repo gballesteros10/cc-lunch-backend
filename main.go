@@ -27,25 +27,41 @@ type LunchOrder struct {
 	ID       primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
 	UserID   primitive.ObjectID `json:"user_id,omitempty" bson:"user_id,omitempty"`
 	OptionID primitive.ObjectID `json:"option_id,omitempty" bson:"option_id,omitempty"`
-	Day      int                `json:"day,omitempty" bson:"day,omitempty"`
+	Day      *int               `json:"day,omitempty" bson:"day,omitempty"`
 }
 
 func CreateLunchOrder(response http.ResponseWriter, request *http.Request) {
 	response.Header().Add("content-type", "application/json")
 
-	var lunchOrder LunchOrder
+	var lunchOrder, existingLunchOrder LunchOrder
 	json.NewDecoder(request.Body).Decode(&lunchOrder)
 	collection := dbClient.Database(dbName).Collection(dbCollectionLunchOrder)
 	ctx, _ := context.WithTimeout(context.Background(), dbRequestDuration)
 
-	result, err := collection.InsertOne(ctx, lunchOrder)
-	if err != nil {
-		fmt.Printf("An error occurred: %+v", err)
+	// user&&day is existing? update : create
+	err := collection.FindOne(ctx, LunchOrder{UserID: lunchOrder.UserID, Day: lunchOrder.Day}).Decode(&existingLunchOrder)
+	if err != nil && err != mongo.ErrNoDocuments {
+		response.WriteHeader(http.StatusInternalServerError)
+		response.Write([]byte(`{"message": "` + err.Error() + `"}`))
+		return
 	}
-	json.NewEncoder(response).Encode(result)
+
+	if err == mongo.ErrNoDocuments {
+		result, err := collection.InsertOne(ctx, lunchOrder)
+		if err != nil {
+			fmt.Printf("An error occurred: %+v", err)
+		}
+		json.NewEncoder(response).Encode(result)
+	} else {
+		//TODO: update
+		fmt.Printf("=============existingLunchOrder: %+v", existingLunchOrder)
+	}
+
 }
 
 func GetLunchOrderByUser(response http.ResponseWriter, request *http.Request) {
+	fmt.Println("GetLunchOrderByUser()")
+	response.Header().Set("Access-Control-Allow-Origin", "*")
 	response.Header().Add("content-type", "application/json")
 	params := mux.Vars(request)
 	userID, _ := primitive.ObjectIDFromHex(params["user_id"])
@@ -87,7 +103,7 @@ func main() {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/lunchorder", CreateLunchOrder).Methods("POST")
-	router.HandleFunc("/lunchorder/{user_id}", GetLunchOrderByUser).Methods("GET")
+	router.HandleFunc("/lunchorder/{user_id}", GetLunchOrderByUser).Methods("GET", "OPTIONS")
 
 	http.ListenAndServe(port, router)
 }
