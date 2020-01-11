@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -24,13 +25,14 @@ const (
 var dbClient *mongo.Client
 
 type LunchOrder struct {
-	ID       primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
-	UserID   primitive.ObjectID `json:"user_id,omitempty" bson:"user_id,omitempty"`
-	OptionID primitive.ObjectID `json:"option_id,omitempty" bson:"option_id,omitempty"`
-	Day      *int               `json:"day,omitempty" bson:"day,omitempty"`
+	ID       primitive.ObjectID  `json:"_id,omitempty" bson:"_id,omitempty"`
+	UserID   primitive.ObjectID  `json:"user_id,omitempty" bson:"user_id,omitempty"`
+	OptionID *primitive.ObjectID `json:"option_id,omitempty" bson:"option_id,omitempty"`
+	Day      *int                `json:"day,omitempty" bson:"day,omitempty"`
 }
 
 func CreateLunchOrder(response http.ResponseWriter, request *http.Request) {
+	response.Header().Set("Access-Control-Allow-Origin", "*")
 	response.Header().Add("content-type", "application/json")
 
 	var lunchOrder, existingLunchOrder LunchOrder
@@ -53,8 +55,11 @@ func CreateLunchOrder(response http.ResponseWriter, request *http.Request) {
 		}
 		json.NewEncoder(response).Encode(result)
 	} else {
-		//TODO: update
-		fmt.Printf("=============existingLunchOrder: %+v", existingLunchOrder)
+		result, err := collection.UpdateOne(ctx, bson.D{{"_id", existingLunchOrder.ID}}, bson.D{{"$set", bson.D{{"option_id", lunchOrder.OptionID}}}})
+		if err != nil {
+			fmt.Printf("An error occurred: %+v", err)
+		}
+		json.NewEncoder(response).Encode(result)
 	}
 
 }
@@ -103,7 +108,7 @@ func main() {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/lunchorder", CreateLunchOrder).Methods("POST")
-	router.HandleFunc("/lunchorder/{user_id}", GetLunchOrderByUser).Methods("GET", "OPTIONS")
+	router.HandleFunc("/lunchorder/{user_id}", GetLunchOrderByUser).Methods("GET")
 
 	http.ListenAndServe(port, router)
 }
