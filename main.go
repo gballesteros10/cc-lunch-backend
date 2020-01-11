@@ -32,6 +32,7 @@ type LunchOrder struct {
 }
 
 func CreateLunchOrder(response http.ResponseWriter, request *http.Request) {
+	fmt.Println("CreateLunchOrder()")
 	response.Header().Set("Access-Control-Allow-Origin", "*")
 	response.Header().Add("content-type", "application/json")
 
@@ -86,9 +87,46 @@ func GetLunchOrderByUser(response http.ResponseWriter, request *http.Request) {
 	defer cursor.Close(ctx)
 
 	for cursor.Next(ctx) {
-		var lunchOrder LunchOrder
-		cursor.Decode(&lunchOrder)
-		lunchOrders = append(lunchOrders, lunchOrder)
+		var lo LunchOrder
+		cursor.Decode(&lo)
+		if lo.OptionID != nil {
+			lunchOrders = append(lunchOrders, lo)
+		}
+	}
+
+	if err := cursor.Err(); err != nil {
+		response.WriteHeader(http.StatusInternalServerError)
+		response.Write([]byte(`{"message": "` + err.Error() + `"}`))
+		return
+	}
+
+	json.NewEncoder(response).Encode(lunchOrders)
+}
+
+func GetAllLunchOrders(response http.ResponseWriter, request *http.Request) {
+	fmt.Println("GetAllLunchOrders()")
+	response.Header().Set("Access-Control-Allow-Origin", "*")
+	response.Header().Add("content-type", "application/json")
+
+	var lunchOrders []LunchOrder
+	collection := dbClient.Database(dbName).Collection(dbCollectionLunchOrder)
+	ctx, _ := context.WithTimeout(context.Background(), dbRequestDuration)
+	cursor, err := collection.Find(ctx, bson.M{})
+	if err != nil {
+		response.WriteHeader(http.StatusInternalServerError)
+		response.Write([]byte(`{"message": "` + err.Error() + `"}`))
+		return
+	}
+
+	defer cursor.Close(ctx)
+
+	for cursor.Next(ctx) {
+		var lo LunchOrder
+		cursor.Decode(&lo)
+
+		if lo.OptionID != nil {
+			lunchOrders = append(lunchOrders, lo)
+		}
 	}
 
 	if err := cursor.Err(); err != nil {
@@ -109,6 +147,7 @@ func main() {
 
 	router.HandleFunc("/lunchorder", CreateLunchOrder).Methods("POST")
 	router.HandleFunc("/lunchorder/{user_id}", GetLunchOrderByUser).Methods("GET")
+	router.HandleFunc("/lunchorder", GetAllLunchOrders).Methods("GET")
 
 	http.ListenAndServe(port, router)
 }
