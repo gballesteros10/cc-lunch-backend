@@ -11,7 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-const collectionName = "lunchorder"
+const colLunchOrder = "lunchorder"
 
 func GetAllLunchOrders(w http.ResponseWriter, r *http.Request) {
 	db, err := config.GetMongoDB()
@@ -21,7 +21,7 @@ func GetAllLunchOrders(w http.ResponseWriter, r *http.Request) {
 	} else {
 		lunchOrderModel := models.LunchOrderModel{
 			Db:         db,
-			Collection: collectionName,
+			Collection: colLunchOrder,
 		}
 
 		lunchOrders, findErr := lunchOrderModel.FindAll()
@@ -42,7 +42,7 @@ func GetLunchOrdersByUser(w http.ResponseWriter, r *http.Request) {
 	} else {
 		lunchOrderModel := models.LunchOrderModel{
 			Db:         db,
-			Collection: collectionName,
+			Collection: colLunchOrder,
 		}
 
 		params := mux.Vars(r)
@@ -65,7 +65,7 @@ func CreateLunchOrder(w http.ResponseWriter, r *http.Request) {
 	} else {
 		lunchOrderModel := models.LunchOrderModel{
 			Db:         db,
-			Collection: collectionName,
+			Collection: colLunchOrder,
 		}
 
 		var lunchOrder entities.LunchOrder
@@ -79,16 +79,4 @@ func CreateLunchOrder(w http.ResponseWriter, r *http.Request) {
 			respondWithJSON(w, http.StatusOK, lunchOrder)
 		}
 	}
-}
-
-func respondWithError(w http.ResponseWriter, code int, msg string) {
-	respondWithJSON(w, code, map[string]string{"error": msg})
-}
-
-func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
-	response, _ := json.Marshal(payload)
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	w.Write(response)
 }

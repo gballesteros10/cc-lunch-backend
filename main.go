@@ -21,6 +21,7 @@ func main() {
 	router.HandleFunc("/lunchorder", api.GetAllLunchOrders).Methods("GET")
 
 	// TODO: user api
+	router.HandleFunc("/login", api.LoginUser).Methods("POST")
 
 	err := http.ListenAndServe(config.Port, router)
 	if err != nil {
